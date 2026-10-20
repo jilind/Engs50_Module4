@@ -14,6 +14,7 @@
 #include "queue.h"
 #include "hash.h"
 #include <string.h>
+#include <sys/stat.h>
 
 int32_t pagesave(webpage_t *pagep, int id, char *dirname) {
 	if (pagep == NULL || dirname == NULL || id < 1 || webpage_getHTML(pagep) == NULL) {
@@ -39,87 +40,115 @@ bool hash_compare(void *page, const void *url) {
     return strcmp(webpage_getURL(page), url) == 0;
 }
 
-int main(void) {
-    webpage_t *page = webpage_new("https://thayer.github.io/engs50/", 0, NULL);
-    if (page == NULL) {
-        return EXIT_FAILURE;
-    }
+int main(int argc, char *argv[]) {
+	if (argc != 4) {
+		fprintf(stderr, "Usage: crawler <seedurl> <pagedir> <maxdepth>\n");
+		return EXIT_FAILURE;
+	}
+	char *seedurl = argv[1];
+  char *pagedir = argv[2];
+	int maxdepth;
+	char extra;
+	if (sscanf(argv[3], "%d%c", &maxdepth, &extra) != 1 ||
+			maxdepth < 0) {
+		fprintf(stderr, "Invalid depth\n");
+		return EXIT_FAILURE;
+	}
+	struct stat info;
 
-    if (!webpage_fetch(page)) {
-        webpage_delete(page);
-        return EXIT_FAILURE;
-    }
+	if (stat(pagedir, &info) != 0 || !S_ISDIR(info.st_mode)) {
+		fprintf(stderr, "Invalid directory\n");
+		return EXIT_FAILURE;
+	}
+	webpage_t *page = webpage_new(seedurl, 0, NULL);
 
-    queue_t *queue = qopen();
-    hashtable_t *hash = hopen(100);
-    if (queue == NULL || hash == NULL) {
-        webpage_delete(page);
-        qclose(queue);
-        hclose(hash);
-        return EXIT_FAILURE;
-    }
+	if (page == NULL) {
+		return EXIT_FAILURE;
+	}
+	if (!IsInternalURL(webpage_getURL(page))) {
+		fprintf(stderr, "Invalid seed URL\n");
+		webpage_delete(page);
+		return EXIT_FAILURE;
+	}
+	queue_t *queue = qopen();
+	hashtable_t *hash = hopen(100);
+	if (queue == NULL || hash == NULL) {
+		webpage_delete(page);
+		if (queue != NULL) qclose(queue);
+		if (hash != NULL) hclose(hash);
+		return EXIT_FAILURE;
+	}
+	char *root = webpage_getURL(page);
+	if (hput(hash, page, root, strlen(root)) != 0) {
+		webpage_delete(page);
+		qclose(queue);
+		hclose(hash);
+		return EXIT_FAILURE;
+	}
+	if (qput(queue, page) != 0) {
+		qclose(queue);
+		happly(hash, webpage_delete);
+		hclose(hash);
+		return EXIT_FAILURE;
+	}
+	int id = 1;
+	int check = 0;
+	webpage_t *cur;
 
-    char *root = webpage_getURL(page);
-    if (hput(hash, page, root, strlen(root)) != 0) {
-        hclose(hash);
-        qclose(queue);
-        webpage_delete(page);
-        return EXIT_FAILURE;
-    }
-
-    int pos = 0;
-    char *link = NULL;
-    webpage_t *cur;
-    int check = 0;
-
-    while ((pos = webpage_getNextURL(page, pos, &link)) > 0) {
-        if (IsInternalURL(link)) {
-            if (hsearch(hash, hash_compare, link, strlen(link)) == NULL) {
-                cur = webpage_new(link, 1, NULL);
-                if (cur == NULL || qput(queue, cur) != 0) {
-                    webpage_delete(cur);
-                    check = 1;
-                } else if (hput(hash, cur, link, strlen(link)) != 0) {
-                    check = 1;
-                }
-            }
-        }
-        else {
-            printf("External Link: %s\n", link);
-        }
-        free(link);
-        link = NULL;
-        if (check == 1) {
-            break;
-        }
-    }
-
-    if (pos == -2) {
-		printf("Allocation error, could not extract URL\n");
-		check = 1;
-    }
-
-    hclose(hash);
-
-    if (check == 1) {
-        while ((cur = qget(queue)) != NULL) {
-            webpage_delete(cur);
-        }
-        webpage_delete(page);
-        qclose(queue);
-        return EXIT_FAILURE;
-    }
-
-    printf("Internal pages in queue:\n");
-
-    int count = 1;
-    while ((cur = qget(queue)) != NULL) {
-        printf("Page %d @ %s\n", count, webpage_getURL(cur));
-        webpage_delete(cur);
-        count++;
-    }
-
-    qclose(queue);
-    webpage_delete(page);
-    return EXIT_SUCCESS;
+	// Process each webpage in the queue
+	while ((cur = qget(queue)) != NULL) {
+		if (!webpage_fetch(cur)) {
+			fprintf(stderr, "Failed to fetch: %s\n", webpage_getURL(cur));
+			continue;
+		}
+		if (pagesave(cur, id, pagedir) != 0) {
+			check = 1;
+			break;
+		}
+		printf("Page %d @ %s\n", id, webpage_getURL(cur));
+		id++;
+		if (webpage_getDepth(cur) < maxdepth) {
+			int pos = 0;
+			int next;
+			char *link = NULL;
+			while ((next = webpage_getNextURL(cur, pos, &link)) > 0) {
+				pos = next;
+				if (IsInternalURL(link)) {
+					if (hsearch(hash, hash_compare, link, strlen(link)) == NULL) {
+						webpage_t *child = webpage_new(link, webpage_getDepth(cur) + 1, NULL);
+						if (child == NULL) {
+							check = 1;
+						}else if (hput(hash, child, link, strlen(link)) != 0) {
+							webpage_delete(child);
+							check = 1;
+						} else if (qput(queue, child) != 0) {
+							check = 1;
+						}
+					}
+				}
+				free(link);
+				link = NULL;
+				if (check == 1) {
+					break;
+				}
+			}
+			free(link);
+			if (next == -2) {
+				fprintf(stderr, "Error extracting URL\n");
+				check = 1;
+			}
+			if (check == 1) {
+				break;
+			}
+		}
+	}
+	while ((cur = qget(queue)) != NULL) {
+	}
+	qclose(queue);
+	happly(hash, webpage_delete);
+	hclose(hash);
+	if (check == 1) {
+		return EXIT_FAILURE;
+	}
+	return EXIT_SUCCESS;
 }
