@@ -14,34 +14,7 @@
 #include "webpage.h"
 #include "queue.h"
 #include "hash.h"
-
-int32_t pagesave(webpage_t *pagep, int id, char *dirname) {                                                        
-  if (pagep == NULL || dirname == NULL || webpage_getHTML(pagep) == NULL || id < 1) {                              
-    fprintf(stderr, "Error saving file!\n");                                                                        
-    return -1;                                                                                
-  }                                                                                                                
-  char filename[256];                                                                                              
-  sprintf(filename, "%s/%d", dirname, id);                                                                         
-  FILE *f = fopen(filename, "w");
-
-  if (f == NULL) {                                                                                                 
-    fprintf(stderr, "Error opening file!\n");                                                                       
-    return -1;                                                                                                     
-  }
-
-  
-  int write1 = fprintf(f, "%s\n", webpage_getURL(pagep));                                                                       
-  int write2 = fprintf(f, "%d\n", webpage_getDepth(pagep));                                                                     
-  int write3 = fprintf(f, "%d\n", webpage_getHTMLlen(pagep));                                                                   
-  int write4 = fprintf(f, "%s", webpage_getHTML(pagep));                                                                        
-  int closure = fclose(f);
-
-  if (write1 < 0 || write2 < 0 || write3 < 0 || write4 < 0 || closure != 0) {
-    fprintf(stderr, "Error writing into file!\n");
-    return -1;
-  }
-  return 0;                                                                                                        
-}    
+#include "pageio.h"
 
 bool hash_compare(void *page, const void *url) {
     return strcmp(webpage_getURL(page), url) == 0;
