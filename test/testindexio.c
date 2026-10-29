@@ -1,7 +1,7 @@
 /* 
  * testindexio.c --- test for indexio.c
  * 
- * Author: Timur Tazeev, James I. Lind
+ * Authors: Timur Tazeev, James I. Lind
  * Created: 10-28-2026
  * Version: 1.0
  * 
@@ -79,23 +79,23 @@ int main(void) {
     hashtable_t *index = hopen(1000);
     assert(index != NULL);
 
-    add_count(index, "hello", 1, 3);
-    add_count(index, "hello", 2, 2);
-    add_count(index, "world", 1, 4);
-    add_count(index, "hello", 1, 1);
+    add_count(index, "cars", 1, 3);
+    add_count(index, "cars", 2, 2);
+    add_count(index, "motor", 1, 4);
+    add_count(index, "cars", 1, 1);
 
     assert(indexsave(index, "test.index") == 0);
 
     hashtable_t *loaded = indexload("test.index");
     assert(loaded != NULL);
 
-    assert(get_count(loaded, "hello", 1) == 4);
-    assert(get_count(loaded, "hello", 2) == 2);
-    assert(get_count(loaded, "world", 1) == 4);
-    assert(get_count(loaded, "world", 2) == 0);
-    assert(get_count(loaded, "hello", 1) +
-           get_count(loaded, "hello", 2) +
-           get_count(loaded, "world", 1) == 10);
+    assert(get_count(loaded, "cars", 1) == 4);
+    assert(get_count(loaded, "cars", 2) == 2);
+    assert(get_count(loaded, "motor", 1) == 4);
+    assert(get_count(loaded, "motor", 2) == 0);
+    assert(get_count(loaded, "cars", 1) +
+           get_count(loaded, "cars", 2) +
+           get_count(loaded, "motor", 1) == 10);
 
     delete_index(loaded);
     delete_index(index);

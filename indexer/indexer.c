@@ -21,7 +21,7 @@
 #include "pageio.h"
 #include "indexio.h"
 
-static size_t total_words = 0;
+static size_t unique_words = 0;
 
 bool NormalizeWord(char *word) {
     if (strlen(word) < 3) {
@@ -113,20 +113,15 @@ static bool add_word(hashtable_t *index, const char *word, int doc_id) {
     return true;
 }
 
-static void sum_document(void *element) {
-    document_t *doc = element;
-    total_words += doc->count;
+static void count_entry(void *element) {
+    (void)element;
+    unique_words++;
 }
 
-static void sum_word(void *element) {
-    wordentry_t *entry = element;
-    qapply(entry->documents, sum_document);
-}
-
-static size_t sumwords(hashtable_t *index) {
-    total_words = 0;
-    happly(index, sum_word);
-    return total_words;
+static size_t count_unique_words(hashtable_t *index) {
+    unique_words = 0;
+    happly(index, count_entry);
+    return unique_words;
 }
 
 int main(int argc, char *argv[]) {
@@ -174,9 +169,8 @@ int main(int argc, char *argv[]) {
 
         webpage_t *page = pageload(doc_id, pagedir);
         if (page == NULL) {
-            fprintf(stderr, "Unable to load page %d\n", doc_id);
-            success = false;
-            break;
+						pages++;
+            continue;
         }
 
         int pos = 0;
@@ -210,7 +204,8 @@ int main(int argc, char *argv[]) {
     }
 
     if (success) {
-        printf("Indexed %d pages. Total words: %zu\n", pages, sumwords(index));
+			printf("Indexed %d pages\n", pages);
+        printf("Unique words: %zu\n", count_unique_words(index));
     } else {
         fprintf(stderr, "Unable to build or save index\n");
     }
