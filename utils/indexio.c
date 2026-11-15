@@ -8,10 +8,11 @@
  * Description: indexio file
  */
 
+#define _POSIX_C_SOURCE 200809L
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdbool.h>
 #include "indexio.h"
 
 static FILE *output;
@@ -35,7 +36,7 @@ static void write_word(void *element) {
     }
 }
 
-int indexsave(hashtable_t *index, const char *filename) {
+int32_t indexsave(hashtable_t *index, const char *filename) {
     if (index == NULL || filename == NULL) {
         return -1;
     }
@@ -80,15 +81,11 @@ hashtable_t *indexload(const char *filename) {
         return NULL;
     }
 
-    char line[8192];
+    char *line = NULL;
+    size_t capacity = 0;
     bool success = true;
 
-    while (success && fgets(line, sizeof(line), fp) != NULL) {
-        if (strchr(line, '\n') == NULL && !feof(fp)) {
-            success = false;
-            break;
-        }
-
+    while (success && getline(&line, &capacity, fp) != -1) {
         char *word = strtok(line, " \t\r\n");
         if (word == NULL) {
             success = false;
@@ -151,6 +148,7 @@ hashtable_t *indexload(const char *filename) {
         }
     }
 
+    free(line);
     if (ferror(fp)) {
         success = false;
     }
