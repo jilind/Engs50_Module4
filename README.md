@@ -1,2 +1,2 @@
-Repository for ENGS 50 Module 4: Tiny Search Engine  
-Authors: James Lind, Timur Tazeev
+Repository for ENGS 50 (F26) Modules 4-7: Tiny Search Engine  
+Authors: Timur Tazeev, James Lind
